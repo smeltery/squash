@@ -1,0 +1,15 @@
+schema-version = "1.18.0"
+
+[install]
+bun.pkg-path = "bun"
+nodejs.pkg-path = "nodejs_22"
+nodejs.outputs = "all"
+pre-commit.pkg-path = "pre-commit"
+pre-commit.outputs = "all"
+actionlint.pkg-path = "actionlint"
+
+[services.dev]
+command = "bun run dev --host 127.0.0.1"
+
+[options]
+systems = ["aarch64-darwin", "x86_64-darwin", "aarch64-linux", "x86_64-linux"]

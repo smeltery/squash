@@ -1,0 +1,61 @@
+name: auto-release
+
+on:
+  workflow_run:
+    workflows: [ci]
+    branches: [master]
+    types: [completed]
+
+concurrency:
+  group: auto-release
+  cancel-in-progress: false
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  release:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - name: Publish the tested build with the next patch version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          git fetch origin master --tags
+          if [ "$RELEASE_SHA" != "$(git rev-parse origin/master)" ]; then
+            echo "Skipping superseded commit"
+            exit 0
+          fi
+          tag="$(git tag --points-at "$RELEASE_SHA" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1 || true)"
+          if [ -z "$tag" ]; then
+            latest="$(git tag | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1 || true)"
+            if [ -z "$latest" ]; then
+              tag=v0.1.0
+            else
+              tag="${latest%.*}.$((${latest##*.} + 1))"
+            fi
+            git tag "$tag" "$RELEASE_SHA"
+            git push origin "$tag"
+          fi
+          gh run download "$RUN_ID" --name site --dir site
+          cp LICENSE site/LICENSE
+          tar -czf squash-site.tar.gz -C site .
+          sha256sum squash-site.tar.gz > squash-site.tar.gz.sha256
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            gh release create "$tag" --verify-tag --draft --generate-notes --title "$tag"
+          fi
+          gh release upload "$tag" squash-site.tar.gz squash-site.tar.gz.sha256 --clobber
+          gh release edit "$tag" --draft=false

@@ -6,6 +6,7 @@
 
 		/* Bundler mode */
 		"moduleResolution": "node",
+		"allowImportingTsExtensions": true,
 		"esModuleInterop": true,
 		"jsx": "react-jsx",
 

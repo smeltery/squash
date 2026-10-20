@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: checks
+        name: CI checks (Flox)
+        entry: flox activate -- bun run check
+        language: system
+        pass_filenames: false
+        always_run: true
